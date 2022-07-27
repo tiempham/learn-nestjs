@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { GlobalService } from 'src/global/global.service';
 import { UsersService } from 'src/users/users.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
-import { JwtService } from '@nestjs/jwt';
-
+import * as bcrypt from 'bcrypt';
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
+    private globalService: GlobalService,
   ) {}
   create(createAuthDto: CreateAuthDto) {
     return 'This action adds a new auth';
@@ -30,9 +30,9 @@ export class AuthService {
     return `This action removes a #${id} auth`;
   }
 
-  async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.usersService.findOne(username);
-    if (user && user.password === pass) {
+  async validateUser(phone: string, pass: string): Promise<any> {
+    const user = await this.usersService.findOne(phone);
+    if (user && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;
       return result;
     }
@@ -40,9 +40,6 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { username: user.username, sub: user.userId };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
+    return this.globalService.generateToken(user);
   }
 }

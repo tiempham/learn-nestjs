@@ -1,13 +1,13 @@
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppService } from './app.service';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 
-import { UploadModule } from './upload/upload.module';
 import { APP_GUARD } from '@nestjs/core';
+import { UploadModule } from './upload/upload.module';
+import { GlobalModule } from './global/global.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -15,10 +15,9 @@ import { APP_GUARD } from '@nestjs/core';
     UsersModule,
     AuthModule,
     UploadModule,
+    GlobalModule,
   ],
-  controllers: [],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

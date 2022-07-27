@@ -1,11 +1,12 @@
-import { PrismaService } from 'src/prisma/prisma.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { User } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import * as moment from 'moment';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User, Prisma } from '@prisma/client';
-import * as moment from 'moment';
-import bcrypt from 'bcrypt';
-import errors from 'common-errors';
+import { verifyUserDtoReturnDto } from './dto/verify-user.dto';
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,8 +29,14 @@ export class UsersService {
     });
     return user;
   }
+  async getUserById(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id },
+    });
+    return user;
+  }
 
-  async requestOtp(phone: string) {
+  async requestOtp(phone: string): Promise<string> {
     const user = await this.getUserByPhone(phone);
     if (user) {
       if (user.otp) {
@@ -47,10 +54,10 @@ export class UsersService {
       const otp = await this.#sendOtp(user);
       return otp;
     }
-    return user;
+    return null;
   }
 
-  async verifyOtp(phone: string, otp: string) {
+  async verifyOtp(phone: string, otp: string): Promise<verifyUserDtoReturnDto> {
     const user = await this.getUserByPhone(phone);
     if (user) {
       if (user.otp) {
@@ -61,11 +68,13 @@ export class UsersService {
           throw new BadRequestException('OTP is expired');
         }
       }
-      if (user.otp === otp) {
-        return user;
-      }
+      if (user.otp !== otp) throw new Error('OTP is not correct');
+      return {
+        user,
+        otp,
+      };
     }
-    throw new BadRequestException('OTP is not valid');
+    throw new BadRequestException('User not found');
   }
 
   async #hashPassword(password: string) {
@@ -80,9 +89,12 @@ export class UsersService {
     if (user) {
       const updatedUser = await this.prisma.user.update({
         where: { id: user.id },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          otpCreateAt: (Number(user.otpCreateAt) - 5 * 60 * 1000).toString(),
+        },
       });
-      return updatedUser;
+      return !!updatedUser;
     }
     throw new BadRequestException('User not found');
   }
@@ -118,8 +130,10 @@ export class UsersService {
     }
   }
 
-  async findOne(username: string): Promise<any | undefined> {
-    return this.users.find((user) => user.username === username);
+  async findOne(phone: string): Promise<User> {
+    return this.prisma.user.findFirst({
+      where: { phone: phone },
+    });
   }
 
   create(createUserDto: CreateUserDto) {
